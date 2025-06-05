@@ -1,0 +1,789 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Image Puzzle Game</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+      color: #333;
+      position: relative;
+      overflow-x: hidden;
+    }
+
+    body::before {
+      content: '';
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: 
+        radial-gradient(circle at 20% 80%, rgba(120, 119, 198, 0.3) 0%, transparent 50%),
+        radial-gradient(circle at 80% 20%, rgba(255, 119, 198, 0.3) 0%, transparent 50%),
+        radial-gradient(circle at 40% 40%, rgba(120, 219, 255, 0.2) 0%, transparent 50%);
+      pointer-events: none;
+      z-index: -1;
+      animation: gradientShift 10s ease-in-out infinite alternate;
+    }
+
+    @keyframes gradientShift {
+      0% { transform: translateX(-10px) translateY(-10px) scale(1); }
+      100% { transform: translateX(10px) translateY(10px) scale(1.02); }
+    }
+
+    .game-container {
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(20px);
+      border-radius: 25px;
+      padding: 40px;
+      box-shadow: 
+        0 25px 50px rgba(0, 0, 0, 0.15),
+        0 10px 20px rgba(0, 0, 0, 0.1),
+        inset 0 1px 0 rgba(255, 255, 255, 0.4);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      max-width: 900px;
+      width: 100%;
+      position: relative;
+    }
+
+    h1 {
+      font-size: 3rem;
+      font-weight: 700;
+      text-align: center;
+      margin-bottom: 30px;
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      position: relative;
+    }
+
+    h1::after {
+      content: '🧩';
+      position: absolute;
+      right: -50px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 2rem;
+      animation: bounce 2s infinite;
+    }
+
+    @keyframes bounce {
+      0%, 20%, 50%, 80%, 100% { transform: translateY(-50%); }
+      40% { transform: translateY(-60%); }
+      60% { transform: translateY(-55%); }
+    }
+
+    #puzzle-container {
+      display: grid;
+      gap: 1px;
+      margin: 30px auto;
+      padding: 15px;
+      background: linear-gradient(145deg, #f0f0f0, #ffffff);
+      border-radius: 20px;
+      box-shadow: 
+        inset 0 5px 15px rgba(0, 0, 0, 0.1),
+        0 10px 25px rgba(0, 0, 0, 0.1);
+      justify-content: center;
+    }
+
+    .tile {
+      width: 100px;
+      height: 100px;
+      background-size: cover;
+      cursor: grab;
+      border-radius: 12px;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      box-shadow: 
+        0 4px 15px rgba(0, 0, 0, 0.1),
+        inset 0 1px 0 rgba(255, 255, 255, 0.2);
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .tile::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, transparent 50%);
+      border-radius: 10px;
+      pointer-events: none;
+    }
+
+    .tile:hover {
+      transform: translateY(-5px) scale(1.05);
+      box-shadow: 
+        0 15px 35px rgba(0, 0, 0, 0.2),
+        0 5px 15px rgba(0, 0, 0, 0.1);
+      border-color: #667eea;
+      cursor: grab;
+    }
+
+    .tile:active {
+      cursor: grabbing;
+    }
+
+    .tile.dragging {
+      opacity: 0.8;
+      transform: rotate(8deg) scale(1.1);
+      z-index: 1000;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+    }
+
+    .tile.correct-position {
+      border-color: #4CAF50;
+      box-shadow: 0 0 20px rgba(76, 175, 80, 0.3);
+    }
+
+    #controls {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      align-items: center;
+      margin-bottom: 30px;
+    }
+
+    .control-row {
+      display: flex;
+      gap: 20px;
+      align-items: center;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    label {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      font-weight: 600;
+      color: #555;
+      min-width: 150px;
+    }
+
+    input[type="file"] {
+      padding: 12px;
+      border: 2px dashed #667eea;
+      border-radius: 15px;
+      background: rgba(102, 126, 234, 0.05);
+      cursor: pointer;
+      transition: all 0.3s ease;
+      font-size: 14px;
+    }
+
+    input[type="file"]:hover {
+      border-color: #764ba2;
+      background: rgba(118, 75, 162, 0.1);
+      transform: translateY(-2px);
+    }
+
+    select {
+      padding: 12px 20px;
+      border: 2px solid #667eea;
+      border-radius: 15px;
+      background: white;
+      font-size: 16px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23667eea' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e");
+      background-position: right 12px center;
+      background-repeat: no-repeat;
+      background-size: 16px;
+      padding-right: 40px;
+    }
+
+    select:hover {
+      border-color: #764ba2;
+      box-shadow: 0 5px 15px rgba(102, 126, 234, 0.2);
+      transform: translateY(-2px);
+    }
+
+    select:focus {
+      outline: none;
+      border-color: #f093fb;
+      box-shadow: 0 0 0 3px rgba(240, 147, 251, 0.2);
+    }
+
+    .button {
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      color: white;
+      border: none;
+      padding: 16px 32px;
+      border-radius: 25px;
+      font-size: 18px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      box-shadow: 
+        0 8px 25px rgba(102, 126, 234, 0.3),
+        inset 0 1px 0 rgba(255, 255, 255, 0.2);
+      position: relative;
+      overflow: hidden;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin: 5px;
+    }
+
+    .button::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+      transition: left 0.5s;
+    }
+
+    .button:hover {
+      transform: translateY(-3px);
+      box-shadow: 
+        0 15px 35px rgba(102, 126, 234, 0.4),
+        inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    }
+
+    .button:hover::before {
+      left: 100%;
+    }
+
+    .button:active {
+      transform: translateY(-1px);
+    }
+
+    .button.secondary {
+      background: linear-gradient(135deg, #f093fb, #f5576c);
+      box-shadow: 0 8px 25px rgba(245, 87, 108, 0.3);
+    }
+
+    .button.secondary:hover {
+      box-shadow: 0 15px 35px rgba(245, 87, 108, 0.4);
+    }
+
+    #game-info {
+      display: flex;
+      gap: 20px;
+      flex-wrap: wrap;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .info-card {
+      font-size: 18px;
+      font-weight: 700;
+      padding: 15px 25px;
+      background: linear-gradient(135deg, #f093fb, #f5576c);
+      color: white;
+      border-radius: 20px;
+      box-shadow: 0 10px 25px rgba(245, 87, 108, 0.3);
+      text-align: center;
+      min-width: 120px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .info-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, transparent 50%);
+      pointer-events: none;
+    }
+
+    .win-animation {
+      animation: celebrate 0.6s ease-in-out;
+    }
+
+    @keyframes celebrate {
+      0%, 100% { transform: scale(1); }
+      25% { transform: scale(1.1) rotate(-5deg); }
+      75% { transform: scale(1.1) rotate(5deg); }
+    }
+
+    .floating-particles {
+      position: fixed;
+      width: 10px;
+      height: 10px;
+      background: linear-gradient(45deg, #667eea, #f093fb);
+      border-radius: 50%;
+      pointer-events: none;
+      opacity: 0.7;
+      animation: float 6s linear infinite;
+    }
+
+    @keyframes float {
+      0% {
+        transform: translateY(100vh) rotate(0deg);
+        opacity: 0;
+      }
+      10% {
+        opacity: 0.7;
+      }
+      90% {
+        opacity: 0.7;
+      }
+      100% {
+        transform: translateY(-100px) rotate(360deg);
+        opacity: 0;
+      }
+    }
+
+    .timer {
+      background: linear-gradient(135deg, #4CAF50, #45a049);
+      box-shadow: 0 10px 25px rgba(76, 175, 80, 0.3);
+    }
+
+    .preview-container {
+      text-align: center;
+      margin: 20px 0;
+    }
+
+    .preview-image {
+      max-width: 200px;
+      max-height: 200px;
+      border-radius: 15px;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+      border: 3px solid rgba(255, 255, 255, 0.3);
+    }
+
+    .difficulty-indicator {
+      font-size: 14px;
+      color: #666;
+      margin-top: 5px;
+    }
+
+    @media (max-width: 768px) {
+      .game-container {
+        padding: 20px;
+        margin: 10px;
+      }
+      
+      h1 {
+        font-size: 2.2rem;
+      }
+      
+      h1::after {
+        right: -35px;
+        font-size: 1.5rem;
+      }
+      
+      .control-row {
+        flex-direction: column;
+        gap: 15px;
+      }
+      
+      .tile {
+        width: 80px;
+        height: 80px;
+      }
+      
+      #puzzle-container {
+        gap: 1px;
+        padding: 10px;
+      }
+      
+      #game-info {
+        flex-direction: column;
+        gap: 10px;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .tile {
+        width: 70px;
+        height: 70px;
+      }
+      
+      h1 {
+        font-size: 1.8rem;
+      }
+      
+      .info-card {
+        font-size: 16px;
+        padding: 12px 20px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="game-container">
+    <h1>Image Puzzle Game</h1>
+    <img id="defaultImage" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='400' viewBox='0 0 400 400'%3E%3Cdefs%3E%3ClinearGradient id='grad1' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' style='stop-color:%23667eea;stop-opacity:1' /%3E%3Cstop offset='50%25' style='stop-color:%23764ba2;stop-opacity:1' /%3E%3Cstop offset='100%25' style='stop-color:%23f093fb;stop-opacity:1' /%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='400' height='400' fill='url(%23grad1)'/%3E%3Cg transform='translate(200,200)'%3E%3Ccircle r='150' fill='none' stroke='white' stroke-width='3' opacity='0.3'/%3E%3Ccircle r='100' fill='none' stroke='white' stroke-width='2' opacity='0.5'/%3E%3Ccircle r='50' fill='none' stroke='white' stroke-width='2' opacity='0.7'/%3E%3Ctext y='10' font-family='Arial' font-size='36' fill='white' text-anchor='middle' font-weight='bold'%3EPUZZLE%3C/text%3E%3C/g%3E%3C/svg%3E" style="display:none;" />
+    
+    <div id="controls">
+      <div class="control-row">
+        <label>
+          📷 Upload Custom Image
+          <input type="file" id="imageUpload" accept="image/*">
+        </label>
+        <label>
+          🎯 Difficulty Level
+          <select id="difficulty">
+            <option value="3">Easy (3x3)</option>
+            <option value="4" selected>Medium (4x4)</option>
+            <option value="5">Hard (5x5)</option>
+            <option value="6">Expert (6x6)</option>
+          </select>
+          <div class="difficulty-indicator">Choose your challenge level</div>
+        </label>
+      </div>
+      
+      <div class="preview-container" id="previewContainer" style="display:none;">
+        <img id="previewImage" class="preview-image" alt="Puzzle Preview">
+        <div style="margin-top: 10px; font-weight: 600; color: #666;">Reference Image</div>
+      </div>
+      
+      <div class="control-row">
+        <button id="startButton" class="button">🚀 Start Puzzle</button>
+      </div>
+      
+      <div id="game-info">
+        <div id="moves-counter" class="info-card">Moves: 0</div>
+        <div id="timer" class="info-card timer">Time: 00:00</div>
+        <div id="progress" class="info-card">Progress: 0%</div>
+      </div>
+    </div>
+    
+    <div id="puzzle-container"></div>
+  </div>
+
+  <script>
+    class PuzzleGame {
+      constructor() {
+        this.image = null;
+        this.gridSize = 4;
+        this.tiles = [];
+        this.moveCount = 0;
+        this.startTime = null;
+        this.gameActive = false;
+        this.timerInterval = null;
+        this.dragSrcEl = null;
+        this.container = document.getElementById("puzzle-container");
+        this.movesCounter = document.getElementById("moves-counter");
+        this.timerElement = document.getElementById("timer");
+        this.progressElement = document.getElementById("progress");
+        this.initializeEventListeners();
+        this.initializeDefaultImage();
+        this.createFloatingParticles();
+      }
+
+      createFloatingParticles() {
+        setInterval(() => {
+          if (Math.random() < 0.1) {
+            const particle = document.createElement('div');
+            particle.className = 'floating-particles';
+            particle.style.left = Math.random() * 100 + 'vw';
+            particle.style.animationDelay = Math.random() * 2 + 's';
+            particle.style.animationDuration = (Math.random() * 4 + 4) + 's';
+            document.body.appendChild(particle);
+            
+            setTimeout(() => {
+              particle.remove();
+            }, 8000);
+          }
+        }, 500);
+      }
+
+      initializeDefaultImage() {
+        const defaultImg = document.getElementById("defaultImage");
+        if (defaultImg && defaultImg.complete) {
+          this.image = defaultImg;
+        } else {
+          defaultImg.onload = () => {
+            this.image = defaultImg;
+          };
+        }
+      }
+
+      initializeEventListeners() {
+        document.getElementById("startButton").addEventListener("click", () => {
+          const fileInput = document.getElementById("imageUpload");
+          const file = fileInput.files[0];
+          const selectedDifficulty = parseInt(document.getElementById("difficulty").value);
+          this.gridSize = selectedDifficulty;
+          
+          if (file) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+              const img = new Image();
+              img.onload = () => {
+                this.image = img;
+                this.showPreview();
+                this.startGame();
+              };
+              img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+          } else {
+            this.startGame();
+          }
+        });
+
+        document.getElementById("imageUpload").addEventListener("change", (e) => {
+          if (e.target.files[0]) {
+            const reader = new FileReader();
+            reader.onload = (event) => {
+              const img = new Image();
+              img.onload = () => {
+                this.showPreview(event.target.result);
+              };
+              img.src = event.target.result;
+            };
+            reader.readAsDataURL(e.target.files[0]);
+          }
+        });
+      }
+
+      showPreview(imageSrc = null) {
+        const previewContainer = document.getElementById("previewContainer");
+        const previewImage = document.getElementById("previewImage");
+        
+        if (imageSrc || this.image) {
+          previewImage.src = imageSrc || (this.image.src || this.image.getAttribute('src'));
+          previewContainer.style.display = "block";
+        }
+      }
+
+      startGame() {
+        if (!this.image) return;
+        
+        this.tiles = [];
+        this.moveCount = 0;
+        this.startTime = Date.now();
+        this.gameActive = true;
+        this.startTimer();
+        this.updateCounters();
+        
+        const { width, height } = this.image;
+        const tileWidth = Math.floor(width / this.gridSize);
+        const tileHeight = Math.floor(height / this.gridSize);
+        this.container.style.gridTemplateColumns = `repeat(${this.gridSize}, 100px)`;
+        this.container.innerHTML = "";
+
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(this.image, 0, 0);
+
+        for (let row = 0; row < this.gridSize; row++) {
+          for (let col = 0; col < this.gridSize; col++) {
+            const x = col * tileWidth;
+            const y = row * tileHeight;
+            const imageData = ctx.getImageData(x, y, tileWidth, tileHeight);
+            const tileCanvas = document.createElement("canvas");
+            tileCanvas.width = 100;
+            tileCanvas.height = 100;
+            const tileCtx = tileCanvas.getContext("2d");
+            
+            const tempCanvas = document.createElement("canvas");
+            tempCanvas.width = tileWidth;
+            tempCanvas.height = tileHeight;
+            const tempCtx = tempCanvas.getContext("2d");
+            tempCtx.putImageData(imageData, 0, 0);
+            
+            tileCtx.drawImage(tempCanvas, 0, 0, tileWidth, tileHeight, 0, 0, 100, 100);
+            
+            const tile = document.createElement("div");
+            tile.classList.add("tile");
+            tile.style.backgroundImage = `url(${tileCanvas.toDataURL()})`;
+            tile.dataset.index = row * this.gridSize + col;
+            tile.dataset.correctIndex = row * this.gridSize + col;
+            this.addDragAndDropHandlers(tile);
+            this.tiles.push(tile);
+          }
+        }
+
+        this.shuffleTiles();
+        this.tiles.forEach(tile => this.container.appendChild(tile));
+        this.updateProgress();
+      }
+
+      shuffleTiles() {
+        // Ensure puzzle is actually shuffled and solvable
+        do {
+          for (let i = this.tiles.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [this.tiles[i], this.tiles[j]] = [this.tiles[j], this.tiles[i]];
+          }
+        } while (this.isSolved());
+      }
+
+      addDragAndDropHandlers(tile) {
+        tile.draggable = true;
+
+        tile.addEventListener("dragstart", (e) => {
+          tile.classList.add("dragging");
+          this.dragSrcEl = tile;
+          e.dataTransfer.effectAllowed = 'move';
+        });
+
+        tile.addEventListener("dragend", (e) => {
+          tile.classList.remove("dragging");
+        });
+
+        tile.addEventListener("dragover", (e) => {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = 'move';
+        });
+
+        tile.addEventListener("dragenter", (e) => {
+          e.preventDefault();
+          if (this.dragSrcEl !== tile) {
+            tile.style.transform = 'scale(0.95)';
+          }
+        });
+
+        tile.addEventListener("dragleave", (e) => {
+          tile.style.transform = '';
+        });
+
+        tile.addEventListener("drop", (e) => {
+          e.preventDefault();
+          tile.style.transform = '';
+          
+          if (this.dragSrcEl !== tile && this.gameActive) {
+            const fromIndex = this.tiles.indexOf(this.dragSrcEl);
+            const toIndex = this.tiles.indexOf(tile);
+            [this.tiles[fromIndex], this.tiles[toIndex]] = [this.tiles[toIndex], this.tiles[fromIndex]];
+            this.container.innerHTML = "";
+            this.tiles.forEach(tile => this.container.appendChild(tile));
+            this.moveCount++;
+            this.updateCounters();
+            this.updateProgress();
+            this.checkWin();
+          }
+        });
+
+        // Touch support for mobile
+        tile.addEventListener("touchstart", (e) => {
+          e.preventDefault();
+          tile.classList.add("dragging");
+        });
+
+        tile.addEventListener("touchend", (e) => {
+          e.preventDefault();
+          tile.classList.remove("dragging");
+        });
+      }
+
+      startTimer() {
+        if (this.timerInterval) {
+          clearInterval(this.timerInterval);
+        }
+        
+        this.timerInterval = setInterval(() => {
+          if (this.gameActive) {
+            const elapsed = Math.floor((Date.now() - this.startTime) / 1000);
+            const minutes = Math.floor(elapsed / 60).toString().padStart(2, '0');
+            const seconds = (elapsed % 60).toString().padStart(2, '0');
+            this.timerElement.textContent = `Time: ${minutes}:${seconds}`;
+          }
+        }, 1000);
+      }
+
+      updateCounters() {
+        this.movesCounter.textContent = `Moves: ${this.moveCount}`;
+        if (this.moveCount > 0) {
+          this.movesCounter.classList.add('win-animation');
+          setTimeout(() => {
+            this.movesCounter.classList.remove('win-animation');
+          }, 600);
+        }
+      }
+
+      updateProgress() {
+        let correctTiles = 0;
+        this.tiles.forEach((tile, index) => {
+          const isCorrect = parseInt(tile.dataset.correctIndex) === index;
+          if (isCorrect) {
+            correctTiles++;
+            tile.classList.add('correct-position');
+          } else {
+            tile.classList.remove('correct-position');
+          }
+        });
+        
+        const progress = Math.round((correctTiles / this.tiles.length) * 100);
+        this.progressElement.textContent = `Progress: ${progress}%`;
+      }
+
+      isSolved() {
+        return this.tiles.every((tile, index) => 
+          parseInt(tile.dataset.correctIndex) === index
+        );
+      }
+
+      checkWin() {
+        if (this.isSolved()) {
+          this.gameActive = false;
+          clearInterval(this.timerInterval);
+          
+          // Celebration animation
+          this.tiles.forEach((tile, index) => {
+            setTimeout(() => {
+              tile.classList.add('win-animation');
+            }, index * 100);
+          });
+          
+          this.createCelebrationParticles();
+          
+          const finalTime = this.timerElement.textContent.split(': ')[1];
+          setTimeout(() => {
+            alert(`🎉 Congratulations! 🎉\n\nYou solved the ${this.gridSize}x${this.gridSize} puzzle!\n\nMoves: ${this.moveCount}\nTime: ${finalTime}\n\nWell done! 🌟`);
+          }, 1000);
+          
+          return true;
+        }
+        return false;
+      }
+
+      createCelebrationParticles() {
+        for (let i = 0; i < 30; i++) {
+          setTimeout(() => {
+            const particle = document.createElement('div');
+            particle.className = 'floating-particles';
+            particle.style.left = Math.random() * 100 + 'vw';
+            particle.style.background = `hsl(${Math.random() * 360}, 70%, 60%)`;
+            particle.style.animationDuration = '3s';
+            particle.style.width = Math.random() * 15 + 5 + 'px';
+            particle.style.height = particle.style.width;
+            document.body.appendChild(particle);
+            
+            setTimeout(() => {
+              particle.remove();
+            }, 3000);
+          }, i * 100);
+        }
+      }
+    }
+
+    document.addEventListener("DOMContentLoaded", function () {
+      const game = new PuzzleGame();
+    });
+  </script>
+</body>
+</html>
